@@ -18,15 +18,24 @@ void setup()
 
 void loop() {
     static uint32_t lastDisplay = 0;
+    static bool startupDone = false;
 
     // sample adc at full speed
-    uint16_t adc = analogRead(A2); // tetra detector pin
+    uint16_t adc = analogRead(A2);
     dataAddSample(adc);
 
-    // do display every 10ms
-    if (millis() - lastDisplay >= 10) {
+    // update display every 10 ms
+    if (millis() - lastDisplay >= 10) 
+    {
         int16_t dbm = (int16_t)round(dataGetDbm());
         updateDBAndBar(dbm);
         lastDisplay = millis();
+    }
+
+    // reinit the display once after 10s incase of weird power issues
+    if (!startupDone && millis() >= 15000) 
+    {
+        displayInit();
+        startupDone = true;
     }
 }
