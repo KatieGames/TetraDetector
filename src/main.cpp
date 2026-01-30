@@ -2,6 +2,9 @@
 #include "data.h"
 #include <Arduino.h>
 
+static uint32_t lastDisplay = 0;
+static bool startupDone = false;
+
 void setup() 
 {
     Serial.begin(115200);
@@ -16,10 +19,8 @@ void setup()
     dataInit();  // initialize data logic for buffering and peak holds
 }
 
-void loop() {
-    static uint32_t lastDisplay = 0;
-    static bool startupDone = false;
-
+void loop() 
+{
     // sample adc at full speed
     uint16_t adc = analogRead(A2);
     dataAddSample(adc);
@@ -32,10 +33,12 @@ void loop() {
         lastDisplay = millis();
     }
 
-    // reinit the display once after 10s incase of weird power issues
+    // Potentially fixed issue with variable declaration location?
+    // reinit the display once after 15s incase of weird power issues
     if (!startupDone && millis() >= 15000) 
     {
         displayInit();
+        displaySafe();
         startupDone = true;
     }
 }
