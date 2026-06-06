@@ -28,7 +28,14 @@ static uint32_t peak_timestamp_ms = 0;   // when peak was last updated
 
 // --- Speed ---
 static float current_speed = 0.0f;    // placeholder for speed value, can be set from data logic
-static float speed_multiplier = 1.0f;    // multiplier to convert from rpm to mph
+static float speed_multiplier = 0.084f;    // multiplier to convert from rpm to mph
+
+// Rolling historical tracking window for low-speed calculation
+static constexpr uint8_t speed_window_size = 50; // 50 samples * 10ms loop = 500ms window
+static uint32_t speed_pulse_history[speed_window_size];
+static uint32_t speed_dt_history[speed_window_size];
+static uint8_t speed_history_index = 0;
+static bool speed_history_full = false;
 
 // --- Helpers ---
 static float median(float *v, uint8_t n) 
@@ -61,6 +68,11 @@ void dataInit()
     buffer_full = false;
     last_update_ms = millis();
     peak_timestamp_ms = 0;
+
+    memset(speed_pulse_history, 0, sizeof(speed_pulse_history));
+    memset(speed_dt_history, 0, sizeof(speed_dt_history));
+    speed_history_index = 0;
+    speed_history_full = false;
 }
 
 // add new ADC sample
@@ -112,13 +124,10 @@ void tetraAddSample(uint16_t adc)
 // add tetra sample
 void speedAddSample(uint32_t speedPulses)
 {
-    // speed is an oscillating square wave that should go up and down 4 times per rpm
-
     static uint32_t last_update_ms = 0;
     uint32_t now = millis();
     uint32_t dt = now - last_update_ms;
 
-    // first call guard
     if (last_update_ms == 0) 
     {
         last_update_ms = now;
@@ -126,15 +135,38 @@ void speedAddSample(uint32_t speedPulses)
     }
 
     if (dt == 0) return;
+    last_update_ms = now;
 
-    // pulses per minute
-    uint32_t pulses_per_min = (speedPulses * 60000UL) / dt;
+    // save loop variables into historical tracker arrays
+    speed_pulse_history[speed_history_index] = speedPulses;
+    speed_dt_history[speed_history_index] = dt;
+    
+    speed_history_index++;
+    if (speed_history_index >= speed_window_size) 
+    {
+        speed_history_index = 0;
+        speed_history_full = true;
+    }
+
+    // compile tracking window values
+    uint8_t count = speed_history_full ? speed_window_size : speed_history_index;
+    uint32_t total_pulses = 0;
+    uint32_t total_dt = 0;
+
+    for (uint8_t i = 0; i < count; i++) 
+    {
+        total_pulses += speed_pulse_history[i];
+        total_dt += speed_dt_history[i];
+    }
+
+    if (total_dt == 0) return;
+
+    // pulses per minute calculated out from window sums
+    uint32_t pulses_per_min = (total_pulses * 60000UL) / total_dt;
 
     // 4 pulses per revolution
     float rpmOfSpeedCable = (float)(pulses_per_min / 4.0f);
     current_speed = rpmOfSpeedCable * speed_multiplier;    // converts cable RPM to actual mph
-
-    last_update_ms = now;
 }
 
 float dataGetDbm() 

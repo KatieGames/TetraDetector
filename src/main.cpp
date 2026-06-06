@@ -5,22 +5,10 @@
 static uint32_t lastDisplay = 0;
 static bool startupDone = false;
 
-// pulse counter from speed sensor
-volatile uint32_t speedPulses = 0;
-
-// using interrupts
-void speedISR()
-{
-    // mechanical reed switch debounce (ignore triggers within 2000 microseconds of the last valid one)
-    static uint32_t last_interrupt_time = 0;
-    uint32_t interrupt_time = micros();
-
-    if (interrupt_time - last_interrupt_time > 2000) 
-    {
-        speedPulses++;
-        last_interrupt_time = interrupt_time;
-    }
-}
+// pulse tracking states
+static uint32_t accumulatedPulses = 0;
+static bool lastPinState = HIGH;
+static uint32_t lastStateChangeTime = 0;
 
 void setup() 
 {
@@ -35,11 +23,12 @@ void setup()
 
     dataInit();  // initialize data logic for buffering and peak holds
 
-    // SPEED INPUT PIN A3
+    // SPEED INPUT PIN A5
     pinMode(A5, INPUT_PULLUP); // Use internal pullup for reed switches to hold line stable
-
-    // interrupt on rising edge of square wave for speed
-    attachInterrupt(digitalPinToInterrupt(A3), speedISR, RISING);
+    
+    // read initial state values
+    lastPinState = digitalRead(A5);
+    lastStateChangeTime = millis();
 }
 
 void loop() 
@@ -48,28 +37,41 @@ void loop()
     uint16_t adc = analogRead(A2);
     tetraAddSample(adc);
 
+    // Read the switch state directly to track changes and prevent interrupt chatter
+    bool currentPinState = digitalRead(A5);
+    if (currentPinState != lastPinState) 
+    {
+        // software debounce window to ensure switch contacts settled cleanly
+        if (millis() - lastStateChangeTime > 5) 
+        {
+            // only increment on the transition change (going from LOW to HIGH)
+            if (lastPinState == LOW && currentPinState == HIGH) 
+            {
+                accumulatedPulses++;
+            }
+            lastPinState = currentPinState;
+            lastStateChangeTime = millis();
+        }
+    }
+
     // update display every 10 ms
     if (millis() - lastDisplay >= 10) 
     {
-        // copy and reset atomically inside the timed block for steady sample intervals
-        uint32_t pulses;
-        noInterrupts();
-        pulses = speedPulses;
-        speedPulses = 0;
-        interrupts();
+        // pass the atomic loop total over to calculation arrays and clear local cache
+        uint32_t loopPulses = accumulatedPulses;
+        accumulatedPulses = 0;
 
-        // convert pulses into whatever your system expects
-        speedAddSample(pulses);
+        speedAddSample(loopPulses);
 
         int16_t dbm = (int16_t)round(dataGetDbm());
         int16_t speed = (int16_t)round(dataGetSpeed());
+        
         updateTextAndBar(dbm, speed);
         lastDisplay = millis();
     }
 
-    // Potentially fixed issue with variable declaration location?
     // reinit the display once after 15s incase of weird power issues
-    if (!startupDone && millis() >= 15000) 
+    if (!startupDone && millis() >= 15000 && millis() < 15100) 
     {
         displayInit();
         displaySafe();

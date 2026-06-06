@@ -20,8 +20,8 @@
 #define DB_TEXT_Y 6
 
 // speed text properties
-#define SPEED_TEXT_X 8    // top left corner of LEFT BOX
-#define SPEED_TEXT_Y 10
+#define SPEED_TEXT_X 2    // moved far left to clear space for a large number
+#define SPEED_TEXT_Y 10   // centered vertically for size 2 text
 
 // configurable for db scaling
 int dbMin = -60;
@@ -81,17 +81,22 @@ void displayUpdateDB(int16_t dbValue)
     display.printf("%+3d", dbValue);    // removed dB text to save space
 }
 
-// update db text
+// update display with large speed value
 void displayUpdateSpeed(int16_t speedValue) 
 {
     int speedY = SPEED_TEXT_Y;
     if (speedY < 0) speedY = 0;
-    if (speedY > SCREEN_HEIGHT - 8) speedY = SCREEN_HEIGHT - 8;
+    if (speedY > SCREEN_HEIGHT - 16) speedY = SCREEN_HEIGHT - 16;
+
+    // wipe the entire left diagnostic container cleanly
+    display.fillRect(0, 0, 52, SCREEN_HEIGHT, SSD1306_BLACK);
 
     display.setTextSize(2);
     display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
     display.setCursor(SPEED_TEXT_X, speedY);
-    display.printf("%d", speedValue);
+    
+    // displays large real-time rolling mph speed configuration
+    display.printf("%3d", speedValue);
 }
 
 // draw horizontal bar
