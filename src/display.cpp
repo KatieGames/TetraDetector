@@ -16,8 +16,12 @@
 #define BAR_HEIGHT 10
 
 // db text properties
-#define DB_TEXT_X 78
+#define DB_TEXT_X 57    // top left corner of box for the speedometer version
 #define DB_TEXT_Y 6
+
+// speed text properties
+#define SPEED_TEXT_X 8    // top left corner of LEFT BOX
+#define SPEED_TEXT_Y 10
 
 // configurable for db scaling
 int dbMin = -60;
@@ -27,7 +31,7 @@ int dbMax = 5;
 int warnDB = -30;   // dbm to go to warn
 int stopDB = -20;   // dbm to go to stop
 
-String currentVersion = "v1.1";
+String currentVersion = "v1.2s";    // s meaning speed
 
 // screen states
 enum ScreenState 
@@ -47,13 +51,6 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 // smooth bar state
 static float smoothedDbm = -90.0f;
 static constexpr float barFallFactor = 0.02f; // smaller = slower fall
-
-// stop blink state
-static bool stopBlinkOn = true;
-static uint16_t stopBlinkCounter = 0;               // frames counter for current blink
-static uint16_t stopBlinkRemaining = 0;             // remaining ON-OFF cycles
-static constexpr uint16_t stopBlinkInterval = 50;   // frames per blink (~0.5s)
-static constexpr uint8_t stopMinCycles = 3;         // minimum flashes per STOP trigger
 
 
 // initialize display
@@ -81,7 +78,20 @@ void displayUpdateDB(int16_t dbValue)
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
     display.setCursor(DB_TEXT_X, textY);
-    display.printf("%+3d dB", dbValue);
+    display.printf("%+3d", dbValue);    // removed dB text to save space
+}
+
+// update db text
+void displayUpdateSpeed(int16_t speedValue) 
+{
+    int speedY = SPEED_TEXT_Y;
+    if (speedY < 0) speedY = 0;
+    if (speedY > SCREEN_HEIGHT - 8) speedY = SCREEN_HEIGHT - 8;
+
+    display.setTextSize(2);
+    display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+    display.setCursor(SPEED_TEXT_X, speedY);
+    display.printf("%d", speedValue);
 }
 
 // draw horizontal bar
@@ -125,7 +135,7 @@ void displayStart()
     display.display();
 }
 
-void updateDBAndBar(int16_t dbValue) 
+void updateTextAndBar(int16_t dbValue, int16_t speedValue) 
 {
     // smooth bar: rise immediately, fall gradually
     if (dbValue > smoothedDbm) 
@@ -152,71 +162,29 @@ void updateDBAndBar(int16_t dbValue)
         requestedState = SAFE;
     }
 
-    // blinks stop
-    if (requestedState == STOP) 
+    // switch screen states
+    if (requestedState != currentScreenState) 
     {
-        // extend remaining flashes if needed
-        if(stopBlinkRemaining < 3)
+        currentScreenState = requestedState;
+        display.clearDisplay();
+        switch (currentScreenState) 
         {
-            stopBlinkRemaining += stopMinCycles; // each trigger adds min flashes
-        }   
+            case SAFE: display.drawBitmap(0, 0, safe_screen, 128, 32, SSD1306_WHITE); break;
+            case WARN: display.drawBitmap(0, 0, warn_screen, 128, 32, SSD1306_WHITE); break;
+            case STOP: display.drawBitmap(0, 0, stop_screen, 128, 32, SSD1306_WHITE); break;
+            case STEALTH: display.drawBitmap(0, 0, stealth_screen, 128, 32, SSD1306_WHITE); break;
+            case START: display.drawBitmap(0, 0, start_screen, 128, 32, SSD1306_WHITE); break;
+            default: break;
+        }
+        display.display();
     }
 
-    bool redraw = false;
-
-    if (stopBlinkRemaining > 0) 
+    // draw bar + db text for SAFE or WARN
+    if (currentScreenState == SAFE || currentScreenState == WARN || currentScreenState == STOP) 
     {
-        // currently in stop sequence
-        stopBlinkCounter++;
-        if (stopBlinkCounter >= stopBlinkInterval) 
-        {
-            stopBlinkCounter = 0;
-            stopBlinkOn = !stopBlinkOn;
-            redraw = true;
-
-            // decrement remaining flashes after OFF phase
-            if (!stopBlinkOn && stopBlinkRemaining > 0) 
-            {
-                stopBlinkRemaining--;
-            }
-        }
-
-        // always show stop while in sequence
-        if (redraw || currentScreenState != STOP) 
-        {
-            currentScreenState = STOP;
-            display.clearDisplay();
-            if (stopBlinkOn) 
-            {
-                display.drawBitmap(0, 0, stop_screen, 128, 32, SSD1306_WHITE);
-            }
-            display.display();
-        }
-    } 
-    else 
-    {
-        // stop sequence finished so switch to requested state
-        if (requestedState != currentScreenState) 
-        {
-            currentScreenState = requestedState;
-            display.clearDisplay();
-            switch (currentScreenState) 
-            {
-                case SAFE: display.drawBitmap(0, 0, safe_screen, 128, 32, SSD1306_WHITE); break;
-                case WARN: display.drawBitmap(0, 0, warn_screen, 128, 32, SSD1306_WHITE); break;
-                case STEALTH: display.drawBitmap(0, 0, stealth_screen, 128, 32, SSD1306_WHITE); break;
-                case START: display.drawBitmap(0, 0, start_screen, 128, 32, SSD1306_WHITE); break;
-                default: break;
-            }
-            display.display();
-        }
-
-        // draw bar + db text for SAFE or WARN
-        if (currentScreenState == SAFE || currentScreenState == WARN) 
-        {
-            drawBar((int16_t)round(smoothedDbm));
-            displayUpdateDB(dbValue);
-            display.display();
-        }
+        drawBar((int16_t)round(smoothedDbm));
+        displayUpdateDB(dbValue);
+        displayUpdateSpeed(speedValue);
+        display.display();
     }
 }

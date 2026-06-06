@@ -2,5 +2,7 @@
 #include <Arduino.h>
 
 void dataInit();
-void dataAddSample(uint16_t adc);
+void tetraAddSample(uint16_t adc);
+void speedAddSample(uint32_t speedPulses);
 float dataGetDbm();
+float dataGetSpeed();

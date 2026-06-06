@@ -5,4 +5,4 @@ void displayInit();
 void displaySafe();
 void displayStealth();
 void displayStart();
-void updateDBAndBar(int16_t dbValue);
+void updateTextAndBar(int16_t dbValue, int16_t speedValue);

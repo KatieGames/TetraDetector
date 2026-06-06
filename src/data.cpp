@@ -26,6 +26,10 @@ static float peak_dbm = -80.0f;
 static uint32_t last_update_ms = 0;
 static uint32_t peak_timestamp_ms = 0;   // when peak was last updated
 
+// --- Speed ---
+static float current_speed = 0.0f;    // placeholder for speed value, can be set from data logic
+static float speed_multiplier = 1.0f;    // multiplier to convert from rpm to mph
+
 // --- Helpers ---
 static float median(float *v, uint8_t n) 
 {
@@ -60,7 +64,7 @@ void dataInit()
 }
 
 // add new ADC sample
-void dataAddSample(uint16_t adc) 
+void tetraAddSample(uint16_t adc) 
 {
     uint32_t now = millis();
     uint32_t dt = now - last_update_ms;
@@ -105,7 +109,40 @@ void dataAddSample(uint16_t adc)
     }
 }
 
+// add tetra sample
+void speedAddSample(uint32_t speedPulses)
+{
+    // speed is an oscillating square wave that should go up and down 4 times per rpm
+
+    static uint32_t last_update_ms = 0;
+    uint32_t now = millis();
+    uint32_t dt = now - last_update_ms;
+
+    // first call guard
+    if (last_update_ms == 0) 
+    {
+        last_update_ms = now;
+        return;
+    }
+
+    if (dt == 0) return;
+
+    // pulses per minute
+    uint32_t pulses_per_min = (speedPulses * 60000UL) / dt;
+
+    // 4 pulses per revolution
+    float rpmOfSpeedCable = (float)(pulses_per_min / 4.0f);
+    current_speed = rpmOfSpeedCable * speed_multiplier;    // converts cable RPM to actual mph
+
+    last_update_ms = now;
+}
+
 float dataGetDbm() 
 {
     return peak_dbm;    // return peak hold value for display
+}
+
+float dataGetSpeed() 
+{
+    return current_speed;    // return peak hold value for display
 }
