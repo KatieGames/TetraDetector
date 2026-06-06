@@ -36,7 +36,7 @@ void setup()
     dataInit();  // initialize data logic for buffering and peak holds
 
     // SPEED INPUT PIN A3
-    pinMode(A3, INPUT_PULLUP); // Use internal pullup for reed switches to hold line stable
+    pinMode(A5, INPUT_PULLUP); // Use internal pullup for reed switches to hold line stable
 
     // interrupt on rising edge of square wave for speed
     attachInterrupt(digitalPinToInterrupt(A3), speedISR, RISING);
