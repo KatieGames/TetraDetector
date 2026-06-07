@@ -61,7 +61,7 @@ void displayInit()
 
     if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR)) 
     {
-        while (1); // cannot init display
+        return; // cannot init display
     }
 
     display.clearDisplay();
@@ -142,32 +142,18 @@ void displayStart()
 
 void updateTextAndBar(int16_t dbValue, int16_t speedValue) 
 {
-    // smooth bar: rise immediately, fall gradually
-    if (dbValue > smoothedDbm) 
-    {
+    // Smooth bar logic...
+    if (dbValue > smoothedDbm) {
         smoothedDbm = dbValue;
-    } 
-    else 
-    {
+    } else {
         smoothedDbm += (dbValue - smoothedDbm) * barFallFactor;
     }
 
-    // determine requested state based on dbValue
     ScreenState requestedState;
-    if (dbValue >= stopDB) 
-    {
-        requestedState = STOP;
-    } 
-    else if (dbValue >= warnDB) 
-    {
-        requestedState = WARN;
-    } 
-    else 
-    {
-        requestedState = SAFE;
-    }
+    if (dbValue >= stopDB) requestedState = STOP;
+    else if (dbValue >= warnDB) requestedState = WARN;
+    else requestedState = SAFE;
 
-    // switch screen states
     if (requestedState != currentScreenState) 
     {
         currentScreenState = requestedState;
@@ -181,15 +167,30 @@ void updateTextAndBar(int16_t dbValue, int16_t speedValue)
             case START: display.drawBitmap(0, 0, start_screen, 128, 32, SSD1306_WHITE); break;
             default: break;
         }
-        display.display();
     }
 
-    // draw bar + db text for SAFE or WARN
     if (currentScreenState == SAFE || currentScreenState == WARN || currentScreenState == STOP) 
     {
         drawBar((int16_t)round(smoothedDbm));
         displayUpdateDB(dbValue);
         displayUpdateSpeed(speedValue);
-        display.display();
+    }
+
+    // --- CRASH RECOVERY IMPLEMENTATION ---
+    // Wire.endTransmission() returns 0 if successful. 
+    // display.display() returns nothing, but we can verify if the bus is alive.
+    display.display(); 
+
+    Wire.beginTransmission(OLED_ADDR);
+    byte error = Wire.endTransmission();
+
+    if (error != 0) 
+    {
+        // The display has dropped off the bus or frozen! Force a reconnection.
+        Wire.begin(); 
+        display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR);
+        
+        // Force screen redraw on next loop by resetting state
+        currentScreenState = START; 
     }
 }

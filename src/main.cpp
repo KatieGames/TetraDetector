@@ -15,7 +15,6 @@ void setup()
     Serial.begin(115200);
 
     displayInit();
-    displayStealth();
     delay(1000);
     displayStart();
     delay(500);
@@ -24,9 +23,9 @@ void setup()
     dataInit();  // initialize data logic for buffering and peak holds
 
     // SPEED INPUT PIN A5
-    pinMode(A5, INPUT_PULLUP); // Use internal pullup for reed switches to hold line stable
+    pinMode(A5, INPUT_PULLUP); // use internal pullup for speed reed switch to hold line stable
     
-    // read initial state values
+    // read initial speed values
     lastPinState = digitalRead(A5);
     lastStateChangeTime = millis();
 }
@@ -54,8 +53,8 @@ void loop()
         }
     }
 
-    // update display every 10 ms
-    if (millis() - lastDisplay >= 10) 
+    // update display every 50 ms
+    if (millis() - lastDisplay >= 50) 
     {
         // pass the atomic loop total over to calculation arrays and clear local cache
         uint32_t loopPulses = accumulatedPulses;
@@ -71,10 +70,10 @@ void loop()
     }
 
     // reinit the display once after 15s incase of weird power issues
-    if (!startupDone && millis() >= 15000 && millis() < 15100) 
-    {
-        displayInit();
-        displaySafe();
-        startupDone = true;
-    }
+    // if (!startupDone && millis() >= 15000 && millis() < 15100) 
+    // {
+    //     displayInit();
+    //     displaySafe();
+    //     startupDone = true;
+    // }
 }

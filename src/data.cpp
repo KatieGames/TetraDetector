@@ -28,7 +28,9 @@ static uint32_t peak_timestamp_ms = 0;   // when peak was last updated
 
 // --- Speed ---
 static float current_speed = 0.0f;    // placeholder for speed value, can be set from data logic
-static float speed_multiplier = 0.084f;    // multiplier to convert from rpm to mph
+static float speed_multiplier = 0.086f;    // multiplier to convert from rpm to mph
+static float smoothed_speed = 0.0f;        // historical smoothed state variable for ema filter
+static constexpr float speed_alpha = 0.15f; // smoothing factor: smaller = smoother, larger = faster response
 
 // Rolling historical tracking window for low-speed calculation
 static constexpr uint8_t speed_window_size = 50; // 50 samples * 10ms loop = 500ms window
@@ -73,6 +75,7 @@ void dataInit()
     memset(speed_dt_history, 0, sizeof(speed_dt_history));
     speed_history_index = 0;
     speed_history_full = false;
+    smoothed_speed = 0.0f;
 }
 
 // add new ADC sample
@@ -167,6 +170,9 @@ void speedAddSample(uint32_t speedPulses)
     // 4 pulses per revolution
     float rpmOfSpeedCable = (float)(pulses_per_min / 4.0f);
     current_speed = rpmOfSpeedCable * speed_multiplier;    // converts cable RPM to actual mph
+
+    // exponential moving average to filter out flickering values while remaining responsive
+    smoothed_speed = (speed_alpha * current_speed) + ((1.0f - speed_alpha) * smoothed_speed);
 }
 
 float dataGetDbm() 
@@ -176,5 +182,5 @@ float dataGetDbm()
 
 float dataGetSpeed() 
 {
-    return current_speed;    // return peak hold value for display
+    return smoothed_speed;    // return smoothed tracking calculation for display
 }
