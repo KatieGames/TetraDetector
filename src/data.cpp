@@ -28,7 +28,7 @@ static uint32_t peak_timestamp_ms = 0;   // when peak was last updated
 
 // --- Speed ---
 static float current_speed = 0.0f;    // placeholder for speed value, can be set from data logic
-static float speed_multiplier = 0.086f;    // multiplier to convert from rpm to mph
+static float speed_multiplier = 0.088f;    // multiplier to convert from rpm to mph
 static float smoothed_speed = 0.0f;        // historical smoothed state variable for ema filter
 static constexpr float speed_alpha = 0.15f; // smoothing factor: smaller = smoother, larger = faster response
 

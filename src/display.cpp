@@ -31,7 +31,7 @@ int dbMax = 5;
 int warnDB = -30;   // dbm to go to warn
 int stopDB = -20;   // dbm to go to stop
 
-String currentVersion = "v1.2s";    // s meaning speed
+String currentVersion = "v1.3s";    // s meaning speed
 
 // screen states
 enum ScreenState 
@@ -58,7 +58,7 @@ void displayInit()
 {
     // pins b6 and b7 are used for i2c
     Wire.begin();
-
+    Wire.setClock(100000);
     if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR)) 
     {
         return; // cannot init display
